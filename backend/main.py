@@ -27,7 +27,12 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    return JSONResponse(status_code=500, content={"detail": str(exc)})
+    origin = request.headers.get("origin", "")
+    cors_headers: dict[str, str] = {}
+    if origin and (CORS_ORIGINS == ["*"] or origin in CORS_ORIGINS):
+        cors_headers["Access-Control-Allow-Origin"] = origin
+        cors_headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(status_code=500, content={"detail": str(exc)}, headers=cors_headers)
 
 
 supabase: Client | None = None
