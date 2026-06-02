@@ -20,7 +20,6 @@ export function createApp(gw) {
       if (!agentId) return res.status(400).json({ ok: false, error: "agentId is required" });
 
       await gw.connect();
-      await gw.request("agents.get", { id: agentId });
       const { runId } = await gw.request("agent", {
         agentId,
         input: normalizeInput(input),
