@@ -24,7 +24,6 @@ export function createApp(gw) {
       const { runId } = await gw.request("agent", {
         agentId,
         message: normalizeInput(input),
-        sessionKey: "main",
         idempotencyKey: randomUUID(),
       });
       const result = await gw.request("agent.wait", { runId }, 185_000);
