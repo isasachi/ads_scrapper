@@ -1,5 +1,6 @@
 import express from "express";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 import { GatewayClient } from "./gateway.js";
 
 function normalizeInput(input) {
@@ -24,9 +25,9 @@ export function createApp(gw) {
         agentId,
         message: normalizeInput(input),
         sessionKey: "main",
-        timeoutSecs: 120,
+        idempotencyKey: randomUUID(),
       });
-      const result = await gw.request("agent.wait", { runId, timeoutSecs: 180 }, 185_000);
+      const result = await gw.request("agent.wait", { runId }, 185_000);
       const output = result?.outputText || result?.finalText || result?.text || "";
 
       let parsed = output;
