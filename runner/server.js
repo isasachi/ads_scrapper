@@ -22,7 +22,7 @@ export function createApp(gw) {
       await gw.connect();
       const { runId } = await gw.request("agent", {
         agentId,
-        input: normalizeInput(input),
+        message: normalizeInput(input),
         sessionKey: "main",
         timeoutSecs: 120,
       });
@@ -44,7 +44,6 @@ export function createApp(gw) {
   return app;
 }
 
-// Only start listening when executed directly (not imported by tests).
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const gw = new GatewayClient({
     url: process.env.OPENCLAW_GATEWAY_URL || "ws://host.docker.internal:18789",
