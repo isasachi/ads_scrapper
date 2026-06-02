@@ -1,0 +1,35 @@
+services:
+  runner:
+    build: ./runner
+    container_name: openclaw-runner
+    environment:
+      PORT: 3001
+      OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "3001:3001"
+
+  backend:
+    build: ./backend
+    container_name: research-backend
+    environment:
+      RUNNER_URL: http://runner:3001
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    depends_on:
+      - runner
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build: ./frontend
+    container_name: research-frontend
+    environment:
+      NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE}
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
