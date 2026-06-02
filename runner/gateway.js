@@ -88,7 +88,7 @@ export class GatewayClient {
               maxProtocol: 4,
               role: "operator",
               scopes: ["operator.read", "operator.write"],
-              client: { id: "runner", version: "1.0.0", platform: "linux", mode: "operator" },
+              client: { id: "gateway-client", version: "1.0.0", platform: "linux", mode: "backend" },
               auth: { token: this.#token },
             },
           }));
