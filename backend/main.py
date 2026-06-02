@@ -13,7 +13,7 @@ from supabase import Client, create_client
 RUNNER_URL = os.getenv("RUNNER_URL", "http://runner:3001")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-CORS_ORIGINS = [x.strip() for x in os.getenv("CORS_ORIGINS", "*").split(",") if x.strip()]
+CORS_ORIGINS = [x.strip().rstrip("/") for x in os.getenv("CORS_ORIGINS", "*").split(",") if x.strip()]
 
 app = FastAPI(title="Research Pipeline API", version="1.0.0")
 app.add_middleware(
