@@ -37,6 +37,7 @@ export function createApp(gw) {
 
       res.json({ ok: true, data: parsed, raw: result });
     } catch (error) {
+      console.error("[run-agent] error:", error);
       res.status(500).json({ ok: false, error: error?.message || String(error) });
     }
   });

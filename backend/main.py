@@ -48,7 +48,8 @@ async def run_agent(agent_id: str, payload: Any) -> Any:
             f"{RUNNER_URL}/run-agent",
             json={"agentId": agent_id, "input": payload},
         )
-        res.raise_for_status()
+        if res.is_error:
+            raise HTTPException(status_code=500, detail={"runner_status": res.status_code, "runner_body": res.text})
         body = res.json()
         if not body.get("ok"):
             raise HTTPException(status_code=500, detail=body)
