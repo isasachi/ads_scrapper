@@ -1,6 +1,6 @@
 # Runner plain-WebSocket refactor Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace `@openclaw/sdk` in the runner service with a hand-rolled WebSocket client (`ws` package) that speaks the OpenClaw gateway protocol directly, keeping the HTTP API surface identical.
 
@@ -27,7 +27,7 @@
 **Files:**
 - Modify: `runner/package.json`
 
-- [ ] **Step 1: Replace contents of `runner/package.json`**
+- [x] **Step 1: Replace contents of `runner/package.json`**
 
 ```json
 {
@@ -47,7 +47,7 @@
 }
 ```
 
-- [ ] **Step 2: Install**
+- [x] **Step 2: Install**
 
 ```bash
 cd runner && npm install
@@ -55,7 +55,7 @@ cd runner && npm install
 
 Expected: `node_modules/ws` present, `@openclaw/sdk` absent.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add runner/package.json runner/package-lock.json
@@ -69,13 +69,13 @@ git commit -m "chore(runner): swap @openclaw/sdk for ws"
 **Files:**
 - Create: `runner/test/gateway.test.js`
 
-- [ ] **Step 1: Create test directory**
+- [x] **Step 1: Create test directory**
 
 ```bash
 mkdir -p runner/test
 ```
 
-- [ ] **Step 2: Create `runner/test/gateway.test.js`**
+- [x] **Step 2: Create `runner/test/gateway.test.js`**
 
 ```javascript
 import { test } from "node:test";
@@ -229,7 +229,7 @@ test("reconnects transparently on next request after disconnect", async () => {
 });
 ```
 
-- [ ] **Step 3: Run — expect failure**
+- [x] **Step 3: Run — expect failure**
 
 ```bash
 cd runner && node --test test/gateway.test.js
@@ -244,7 +244,7 @@ Expected: `Error: Cannot find module '../gateway.js'`
 **Files:**
 - Create: `runner/gateway.js`
 
-- [ ] **Step 1: Create `runner/gateway.js`**
+- [x] **Step 1: Create `runner/gateway.js`**
 
 ```javascript
 import { WebSocket } from "ws";
@@ -374,7 +374,7 @@ export class GatewayClient {
 }
 ```
 
-- [ ] **Step 2: Run gateway tests**
+- [x] **Step 2: Run gateway tests**
 
 ```bash
 cd runner && node --test test/gateway.test.js
@@ -392,7 +392,7 @@ Expected: all 7 tests pass.
 ✔ reconnects transparently on next request after disconnect
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add runner/gateway.js runner/test/gateway.test.js
@@ -406,7 +406,7 @@ git commit -m "feat(runner): add GatewayClient with plain-ws protocol"
 **Files:**
 - Create: `runner/test/server.test.js`
 
-- [ ] **Step 1: Create `runner/test/server.test.js`**
+- [x] **Step 1: Create `runner/test/server.test.js`**
 
 ```javascript
 import { test } from "node:test";
@@ -521,7 +521,7 @@ test("POST /run-agent returns 500 when gateway throws", async () => {
 });
 ```
 
-- [ ] **Step 2: Run — expect failure**
+- [x] **Step 2: Run — expect failure**
 
 ```bash
 cd runner && node --test test/server.test.js
@@ -536,7 +536,7 @@ Expected: `SyntaxError` or `does not provide an export named 'createApp'` — `s
 **Files:**
 - Modify: `runner/server.js`
 
-- [ ] **Step 1: Replace contents of `runner/server.js`**
+- [x] **Step 1: Replace contents of `runner/server.js`**
 
 ```javascript
 import express from "express";
@@ -599,7 +599,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 ```
 
-- [ ] **Step 2: Run all tests**
+- [x] **Step 2: Run all tests**
 
 ```bash
 cd runner && npm test
@@ -626,7 +626,7 @@ Expected: all 13 tests pass.
   ✔ POST /run-agent returns 500 when gateway throws
 ```
 
-- [ ] **Step 3: Verify the entry point starts without a live gateway**
+- [x] **Step 3: Verify the entry point starts without a live gateway**
 
 ```bash
 cd runner && OPENCLAW_GATEWAY_TOKEN=test node server.js &
@@ -635,7 +635,7 @@ sleep 1 && curl -s http://localhost:3001/health && kill %1
 
 Expected: `{"ok":true}` — the server starts and responds to health checks without attempting a WS connection (connect is lazy, on first `/run-agent`).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add runner/server.js runner/test/server.test.js
