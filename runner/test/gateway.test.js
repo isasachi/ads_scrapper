@@ -3,12 +3,15 @@ import assert from "node:assert/strict";
 import { WebSocketServer } from "ws";
 import { GatewayClient } from "../gateway.js";
 
-// Starts a mock WS server on a random port. Returns { wss, url }.
+// Starts a mock WS server on a random port. Returns { wss, url, close }.
+// close() terminates open client connections before closing the server so the
+// event loop is not kept alive by lingering sockets.
 function mockGateway(onConnection) {
   const wss = new WebSocketServer({ port: 0 });
   wss.on("connection", onConnection);
   const { port } = wss.address();
-  return { wss, url: `ws://127.0.0.1:${port}` };
+  const close = () => { wss.clients.forEach((c) => c.terminate()); wss.close(); };
+  return { wss, url: `ws://127.0.0.1:${port}`, close };
 }
 
 // Sends connect.challenge and responds to the connect handshake.
@@ -30,15 +33,15 @@ function doHandshake(ws) {
 }
 
 test("connects after challenge/hello-ok handshake", async () => {
-  const { wss, url } = mockGateway((ws) => doHandshake(ws));
+  const { wss, url, close } = mockGateway((ws) => doHandshake(ws));
   const gw = new GatewayClient({ url, token: "test-token" });
   await gw.connect();
-  wss.close();
+  close();
 });
 
 test("connect sends token in auth params", async () => {
   let receivedToken;
-  const { wss, url } = mockGateway((ws) => {
+  const { wss, url, close } = mockGateway((ws) => {
     ws.send(JSON.stringify({ type: "event", event: "connect.challenge", payload: { nonce: "n", ts: 1 } }));
     ws.on("message", (raw) => {
       const frame = JSON.parse(raw.toString());
@@ -51,11 +54,11 @@ test("connect sends token in auth params", async () => {
   const gw = new GatewayClient({ url, token: "secret-token" });
   await gw.connect();
   assert.equal(receivedToken, "secret-token");
-  wss.close();
+  close();
 });
 
 test("request sends framed req and resolves with payload", async () => {
-  const { wss, url } = mockGateway((ws) => {
+  const { wss, url, close } = mockGateway((ws) => {
     doHandshake(ws);
     ws.on("message", (raw) => {
       const frame = JSON.parse(raw.toString());
@@ -70,11 +73,11 @@ test("request sends framed req and resolves with payload", async () => {
   const gw = new GatewayClient({ url, token: "t" });
   const result = await gw.request("echo", { value: "hello" });
   assert.deepEqual(result, { value: "hello" });
-  wss.close();
+  close();
 });
 
 test("request rejects when ok:false", async () => {
-  const { wss, url } = mockGateway((ws) => {
+  const { wss, url, close } = mockGateway((ws) => {
     doHandshake(ws);
     ws.on("message", (raw) => {
       const frame = JSON.parse(raw.toString());
@@ -91,22 +94,22 @@ test("request rejects when ok:false", async () => {
     () => gw.request("agents.get", { id: "bad" }),
     /not found/,
   );
-  wss.close();
+  close();
 });
 
 test("request rejects on timeout", async () => {
   // Server completes handshake but never responds to other requests.
-  const { wss, url } = mockGateway((ws) => doHandshake(ws));
+  const { wss, url, close } = mockGateway((ws) => doHandshake(ws));
   const gw = new GatewayClient({ url, token: "t" });
   await assert.rejects(
     () => gw.request("slow", {}, 100),
     /request timeout/,
   );
-  wss.close();
+  close();
 });
 
 test("pending requests reject when connection drops", async () => {
-  const { wss, url } = mockGateway((ws) => {
+  const { wss, url, close } = mockGateway((ws) => {
     doHandshake(ws);
     setTimeout(() => ws.close(), 100); // drop after 100 ms
   });
@@ -116,12 +119,12 @@ test("pending requests reject when connection drops", async () => {
     () => gw.request("slow", {}, 5_000),
     /connection lost/,
   );
-  wss.close();
+  close();
 });
 
 test("reconnects transparently on next request after disconnect", async () => {
   let connCount = 0;
-  const { wss, url } = mockGateway((ws) => {
+  const { wss, url, close } = mockGateway((ws) => {
     connCount++;
     doHandshake(ws);
     ws.on("message", (raw) => {
@@ -145,5 +148,5 @@ test("reconnects transparently on next request after disconnect", async () => {
   const result = await gw.request("ping", {});
   assert.deepEqual(result, { pong: true });
   assert.equal(connCount, 2);
-  wss.close();
+  close();
 });
