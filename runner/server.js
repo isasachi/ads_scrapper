@@ -21,20 +21,36 @@ export function createApp(gw) {
       if (!agentId) return res.status(400).json({ ok: false, error: "agentId is required" });
 
       await gw.connect();
+
+      let outputText = "";
+      const unsubscribe = gw.onEvent((frame) => {
+        const p = frame.payload;
+        if (!p) return;
+        if (frame.event === "agent" && p.stream === "assistant" && typeof p.data?.text === "string") {
+          outputText = p.data.text; // cumulative — keep latest
+        }
+      });
+
       const { runId } = await gw.request("agent", {
         agentId,
         message: normalizeInput(input),
         idempotencyKey: randomUUID(),
       });
-      const result = await gw.request("agent.wait", { runId }, 185_000);
-      const output = result?.outputText || result?.finalText || result?.text || "";
+
+      const waitResult = await gw.request("agent.wait", { runId }, 185_000);
+      unsubscribe();
+      console.log("[agent.wait] result:", JSON.stringify(waitResult));
+
+      const output = outputText ||
+        waitResult?.output?.text ||
+        waitResult?.outputText || waitResult?.text || "";
 
       let parsed = output;
       try {
         parsed = JSON.parse(output);
       } catch {}
 
-      res.json({ ok: true, data: parsed, raw: result });
+      res.json({ ok: true, data: parsed, raw: waitResult });
     } catch (error) {
       console.error("[run-agent] error:", error);
       res.status(500).json({ ok: false, error: error?.message || String(error) });

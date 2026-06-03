@@ -8,6 +8,7 @@ export class GatewayClient {
   #token;
   #ws = null;
   #pending = new Map(); // id → { resolve, reject, timer }
+  #eventHandlers = new Set();
   #connected = false;
   #connecting = null; // in-flight connect Promise
 
@@ -64,6 +65,10 @@ export class GatewayClient {
           return;
         }
 
+        if (frame.type === "event" && frame.event !== "connect.challenge") {
+          for (const handler of this.#eventHandlers) handler(frame);
+        }
+
         if (frame.type === "event" && frame.event === "connect.challenge") {
           const id = randomUUID();
           this.#pending.set(id, {
@@ -108,6 +113,11 @@ export class GatewayClient {
         }
       });
     });
+  }
+
+  onEvent(handler) {
+    this.#eventHandlers.add(handler);
+    return () => this.#eventHandlers.delete(handler);
   }
 
   async request(method, params, timeoutMs = 30_000) {
