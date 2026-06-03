@@ -7,6 +7,11 @@ function normalizeInput(input) {
   return typeof input === "string" ? input : JSON.stringify(input);
 }
 
+function eventRunId(frame) {
+  const p = frame?.payload;
+  return p?.runId || p?.data?.runId || p?.meta?.runId || frame?.runId || frame?.data?.runId || null;
+}
+
 export function createApp(gw) {
   const app = express();
   app.use(express.json({ limit: "2mb" }));
@@ -23,17 +28,6 @@ export function createApp(gw) {
 
       await gw.connect();
 
-      let outputText = "";
-      if (typeof gw.onEvent === "function") {
-        unsubscribe = gw.onEvent((frame) => {
-          const p = frame.payload;
-          if (!p) return;
-          if (frame.event === "agent" && p.stream === "assistant" && typeof p.data?.text === "string") {
-            outputText = p.data.text;
-          }
-        });
-      }
-
       const agentResult = await gw.request("agent", {
         agentId,
         message: normalizeInput(input),
@@ -42,6 +36,19 @@ export function createApp(gw) {
       const runId = agentResult?.runId;
       if (!runId) {
         throw new Error(`agent did not return runId: ${JSON.stringify(agentResult)}`);
+      }
+
+      let outputText = "";
+      if (typeof gw.onEvent === "function") {
+        unsubscribe = gw.onEvent((frame) => {
+          const p = frame?.payload;
+          if (!p) return;
+          if (frame.event !== "agent") return;
+          if (eventRunId(frame) !== runId) return;
+          if (p.stream === "assistant" && typeof p.data?.text === "string") {
+            outputText = p.data.text;
+          }
+        });
       }
 
       const waitResult = await gw.request("agent.wait", { runId }, 185_000);

@@ -93,6 +93,77 @@ test("POST /run-agent falls back to finalText when outputText absent", async () 
   server.close();
 });
 
+test("POST /run-agent ignores assistant stream events from other runs", async () => {
+  const handlers = new Set();
+  const gw = {
+    connect: async () => {},
+    onEvent: (handler) => {
+      handlers.add(handler);
+      return () => handlers.delete(handler);
+    },
+    request: async (method) => {
+      if (method === "agent") return { runId: "run-1" };
+      if (method === "agent.wait") {
+        for (const handler of handlers) {
+          handler({
+            event: "agent",
+            payload: { runId: "run-2", stream: "assistant", data: { text: "wrong-run" } },
+          });
+          handler({
+            event: "agent",
+            payload: { runId: "run-1", stream: "assistant", data: { text: "right-run" } },
+          });
+        }
+        return { outputText: "wait-output" };
+      }
+      throw new Error(`unexpected method: ${method}`);
+    },
+  };
+  const server = createApp(gw).listen(0);
+  const { status, body } = await req(server, "POST", "/run-agent", {
+    agentId: "seed-generator",
+    input: "test",
+  });
+  assert.equal(status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.data, "right-run");
+  assert.equal(handlers.size, 0);
+  server.close();
+});
+
+test("POST /run-agent falls back when assistant event lacks matching run id", async () => {
+  const handlers = new Set();
+  const gw = {
+    connect: async () => {},
+    onEvent: (handler) => {
+      handlers.add(handler);
+      return () => handlers.delete(handler);
+    },
+    request: async (method) => {
+      if (method === "agent") return { runId: "run-1" };
+      if (method === "agent.wait") {
+        for (const handler of handlers) {
+          handler({
+            event: "agent",
+            payload: { runId: "run-2", stream: "assistant", data: { text: "wrong-run" } },
+          });
+        }
+        return { finalText: "fallback" };
+      }
+      throw new Error(`unexpected method: ${method}`);
+    },
+  };
+  const server = createApp(gw).listen(0);
+  const { status, body } = await req(server, "POST", "/run-agent", {
+    agentId: "seed-generator",
+    input: "test",
+  });
+  assert.equal(status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.data, "fallback");
+  server.close();
+});
+
 test("POST /run-agent returns 500 when gateway throws", async () => {
   const gw = {
     connect: async () => {},
