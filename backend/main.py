@@ -56,6 +56,55 @@ async def run_agent(agent_id: str, payload: Any) -> Any:
         return body["data"]
 
 
+def _parse_json_string_if_needed(value: Any) -> Any:
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.startswith("{") or stripped.startswith("["):
+            try:
+                return json.loads(stripped)
+            except json.JSONDecodeError:
+                return value
+    return value
+
+
+def _expect_seed_payload(value: Any) -> dict[str, Any]:
+    value = _parse_json_string_if_needed(value)
+    if not isinstance(value, dict):
+        raise HTTPException(status_code=502, detail={
+            "stage": "seed-generator",
+            "message": "seed-generator devolvió un formato inválido; se esperaba un objeto JSON",
+            "received_type": type(value).__name__,
+            "received_preview": str(value)[:400],
+        })
+    keywords = value.get("keywords")
+    countries = value.get("countries")
+    if not isinstance(keywords, list) or not isinstance(countries, list):
+        raise HTTPException(status_code=502, detail={
+            "stage": "seed-generator",
+            "message": "seed-generator devolvió un objeto sin keywords/countries válidos",
+            "received_preview": str(value)[:400],
+        })
+    return value
+
+
+def _expect_list_of_dicts(value: Any, stage: str) -> list[dict[str, Any]]:
+    value = _parse_json_string_if_needed(value)
+    if not isinstance(value, list):
+        raise HTTPException(status_code=502, detail={
+            "stage": stage,
+            "message": f"{stage} devolvió un formato inválido; se esperaba una lista JSON",
+            "received_type": type(value).__name__,
+            "received_preview": str(value)[:400],
+        })
+    if not all(isinstance(item, dict) for item in value):
+        raise HTTPException(status_code=502, detail={
+            "stage": stage,
+            "message": f"{stage} devolvió una lista con elementos inválidos; se esperaban objetos JSON",
+            "received_preview": str(value)[:400],
+        })
+    return value
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"ok": "true"}
@@ -63,27 +112,27 @@ async def health() -> dict[str, str]:
 
 @app.post("/api/research/seed")
 async def research_seed(req: QueryRequest) -> dict[str, Any]:
-    data = await run_agent("seed-generator", req.query)
+    data = _expect_seed_payload(await run_agent("seed-generator", req.query))
     return {"ok": True, "data": data}
 
 
 @app.post("/api/research/scrape")
 async def research_scrape(req: SeedRequest) -> dict[str, Any]:
-    data = await run_agent("scraper-core", req.model_dump())
+    data = _expect_list_of_dicts(await run_agent("scraper-core", req.model_dump()), "scraper-core")
     return {"ok": True, "data": data}
 
 
 @app.post("/api/research/evaluate")
 async def research_evaluate(req: EvaluateRequest) -> dict[str, Any]:
-    data = await run_agent("evaluator-agent", req.ads)
+    data = _expect_list_of_dicts(await run_agent("evaluator-agent", req.ads), "evaluator-agent")
     return {"ok": True, "data": data}
 
 
 @app.post("/api/research/run")
 async def research_run(req: QueryRequest) -> dict[str, Any]:
-    seed = await run_agent("seed-generator", req.query)
-    scraped = await run_agent("scraper-core", seed)
-    evaluated = await run_agent("evaluator-agent", scraped)
+    seed = _expect_seed_payload(await run_agent("seed-generator", req.query))
+    scraped = _expect_list_of_dicts(await run_agent("scraper-core", seed), "scraper-core")
+    evaluated = _expect_list_of_dicts(await run_agent("evaluator-agent", scraped), "evaluator-agent")
 
     run_id = None
     if supabase:

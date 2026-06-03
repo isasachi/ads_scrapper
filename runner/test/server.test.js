@@ -126,8 +126,41 @@ test("POST /run-agent ignores assistant stream events from other runs", async ()
   });
   assert.equal(status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.data, "right-run");
+  assert.equal(body.data, "wait-output");
   assert.equal(handlers.size, 0);
+  server.close();
+});
+
+test("POST /run-agent prefers final wait result over interim assistant stream", async () => {
+  const handlers = new Set();
+  const gw = {
+    connect: async () => {},
+    onEvent: (handler) => {
+      handlers.add(handler);
+      return () => handlers.delete(handler);
+    },
+    request: async (method) => {
+      if (method === "agent") return { runId: "run-1" };
+      if (method === "agent.wait") {
+        for (const handler of handlers) {
+          handler({
+            event: "agent",
+            payload: { runId: "run-1", stream: "assistant", data: { text: "Entendido. Voy a iniciar..." } },
+          });
+        }
+        return { outputText: '[{"meta_ad_id":"123"}]' };
+      }
+      throw new Error(`unexpected method: ${method}`);
+    },
+  };
+  const server = createApp(gw).listen(0);
+  const { status, body } = await req(server, "POST", "/run-agent", {
+    agentId: "scraper-core",
+    input: { keywords: ["demo"], countries: ["MX"] },
+  });
+  assert.equal(status, 200);
+  assert.equal(body.ok, true);
+  assert.deepEqual(body.data, [{ meta_ad_id: "123" }]);
   server.close();
 });
 

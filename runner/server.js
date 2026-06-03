@@ -54,13 +54,14 @@ export function createApp(gw) {
       const waitResult = await gw.request("agent.wait", { runId }, 185_000);
       console.log("[agent.wait] result:", JSON.stringify(waitResult));
 
-      const output = outputText ||
+      const output =
         waitResult?.snapshot?.outputText ||
         waitResult?.snapshot?.finalText ||
         waitResult?.output?.text ||
         waitResult?.outputText ||
         waitResult?.finalText ||
-        waitResult?.text || "";
+        waitResult?.text ||
+        outputText || "";
 
       let parsed = output;
       try {
