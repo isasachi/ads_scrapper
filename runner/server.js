@@ -16,6 +16,7 @@ export function createApp(gw) {
   });
 
   app.post("/run-agent", async (req, res) => {
+    let unsubscribe = () => {};
     try {
       const { agentId, input } = req.body || {};
       if (!agentId) return res.status(400).json({ ok: false, error: "agentId is required" });
@@ -23,27 +24,36 @@ export function createApp(gw) {
       await gw.connect();
 
       let outputText = "";
-      const unsubscribe = gw.onEvent((frame) => {
-        const p = frame.payload;
-        if (!p) return;
-        if (frame.event === "agent" && p.stream === "assistant" && typeof p.data?.text === "string") {
-          outputText = p.data.text; // cumulative — keep latest
-        }
-      });
+      if (typeof gw.onEvent === "function") {
+        unsubscribe = gw.onEvent((frame) => {
+          const p = frame.payload;
+          if (!p) return;
+          if (frame.event === "agent" && p.stream === "assistant" && typeof p.data?.text === "string") {
+            outputText = p.data.text;
+          }
+        });
+      }
 
-      const { runId } = await gw.request("agent", {
+      const agentResult = await gw.request("agent", {
         agentId,
         message: normalizeInput(input),
         idempotencyKey: randomUUID(),
       });
+      const runId = agentResult?.runId;
+      if (!runId) {
+        throw new Error(`agent did not return runId: ${JSON.stringify(agentResult)}`);
+      }
 
       const waitResult = await gw.request("agent.wait", { runId }, 185_000);
-      unsubscribe();
       console.log("[agent.wait] result:", JSON.stringify(waitResult));
 
       const output = outputText ||
+        waitResult?.snapshot?.outputText ||
+        waitResult?.snapshot?.finalText ||
         waitResult?.output?.text ||
-        waitResult?.outputText || waitResult?.text || "";
+        waitResult?.outputText ||
+        waitResult?.finalText ||
+        waitResult?.text || "";
 
       let parsed = output;
       try {
@@ -54,6 +64,8 @@ export function createApp(gw) {
     } catch (error) {
       console.error("[run-agent] error:", error);
       res.status(500).json({ ok: false, error: error?.message || String(error) });
+    } finally {
+      unsubscribe();
     }
   });
 
